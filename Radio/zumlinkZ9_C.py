@@ -12,40 +12,26 @@ def log(msg, verbose):
 
 class Radio(Serial):
 
-    def __init__(self, dev, baudrate=115200, verbose=False):
+    def __init__(self, dev, baudrate=115200, debug=False):
         super().__init__(dev, baudrate=baudrate)
-        print("Radio Initialized: {0}-{1}Baud".format(dev, baudrate))
+        log("Radio Initialized: {0}-{1}Baud".format(dev, baudrate), debug)
         self.transmissions = {}
-        self.v = verbose
+        self.v = debug
         self.count = 0
 
-    def packetizeSerialize(self, data: dict):
+    def serialize(self, data: dict):
         bsonObject = bson.dumps(data)
         size = len(bsonObject)
         start = "A{0}A".format(size).encode()
         bsonObject = start + bsonObject
         return bsonObject
 
-    def parsePacketized(data: bytes):
-        # basic transmitting format
-        if data[0] == 65 and data[-1] == 122:
-            data = data[0, len(data) - 1]
-            size = b''
-            i = 1
-            while True:
-                if data[i] == 65:
-                    break
-                else:
-                    size = size + data[i]
-            size = size.decode()
-        else:
-            raise Exception("Corrupted Data")
-
     def debug(self):
         # debug terminal to set env variables
+        #press the button on the side of the dev board to access the cli
         assert super().isOpen() == True
         while 1:
-            req = input("term>>>")
+            req = input("<ZUMLINK>")
             if req == "exit()":
                 break
             req = req.encode()
@@ -58,7 +44,7 @@ class Radio(Serial):
                     print(output.decode(), end='')
 
     def transmit(self, data: dict):
-        data = self.packetizeSerialize(data)
+        data = self.serialize(data)
         log(super().write(data), self.v)
         time.sleep(0.1)
 
@@ -66,15 +52,17 @@ class Radio(Serial):
         while True:
             log("Waiting:{0} Bytes".format(super().inWaiting()), self.v)
             while True:
-                buffer = super().read(1).decode()
+                buffer = super().read(1)
                 size = ""
-                if buffer == 'A':
+                log(buffer, self.v)
+                if buffer == b'A':
                     while True:
-                        buffer = super().read(1).decode()
-                        if buffer == 'A':
+                        buffer = super().read(1)
+                        log(buffer, self.v)
+                        if buffer == b'A':
                             break #breaks right before the message body
                         else:
-                            size += buffer
+                            size += buffer.decode()
                             continue
                     log("Message Size:{0} Bytes".format(size), self.v)
                     size = int(size)  # converts string literal number into a number datatype
@@ -85,16 +73,17 @@ class Radio(Serial):
                     self.dump(data)
                     self.count += 1
                 else:
+                    log("Buffer: {0} Bytes".format(super().inWaiting()), self.v)
                     continue
 
     def dump(self, data:dict):
-        with open("transmission{0}.packet".format(), "w") as f:
+        with open("transmission{0}.packet".format(self.count), "w") as f:
             f.write(json.dumps(data, indent=4))
         f.close()
 
 if __name__ == "__main__":
-    dummy = {"dummy": 0}
+    dummy = {"shit": 0}
     # print(dummy)
     # ZumlinkZ9.packetizeSerialize(dummy)
-    com = Radio(dev="COM12", verbose=True)
+    com = Radio(dev="COM12", debug=True)
     com.transmit(dummy)
