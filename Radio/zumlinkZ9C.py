@@ -6,18 +6,28 @@ import time
 from datetime import date
 import json
 
+import platform
+global spacer
+if "Windows" == platform.system():
+    spacer = "\\"
+else:
+    spacer = "/"
+
+
+
 def log(msg, verbose):
     if verbose:
         print(msg)
 
 class Radio(Serial):
 
-    def __init__(self, dev, baudrate=115200, debug=False):
+    def __init__(self, dev, baudrate=115200, debug=False, packetdir = "packets"+spacer):
         super().__init__(dev, baudrate=baudrate)
         log("Radio Initialized: {0}-{1}Baud".format(dev, baudrate), debug)
         self.transmissions = {}
         self.v = debug
         self.count = 0
+        self.packetdir = packetdir
 
     def serialize(self, data: dict):
         bsonObject = bson.dumps(data)
@@ -70,6 +80,7 @@ class Radio(Serial):
                         data = bson.loads(super().read(size))
                     except Exception("Corrupted Data"):
                         continue
+                    log("MSG: {0}".format(data), self.v)
                     self.dump(data)
                     self.count += 1
                 else:
@@ -77,7 +88,7 @@ class Radio(Serial):
                     continue
 
     def dump(self, data:dict):
-        with open("transmission{0}.packet".format(self.count), "w") as f:
+        with open("{1}transmission{0}.packet".format(self.count, self.packetdir), "w") as f:
             f.write(json.dumps(data, indent=4))
         f.close()
 
